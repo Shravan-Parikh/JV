@@ -55,20 +55,36 @@ gcloud run deploy "$SERVICE" \
   --allow-unauthenticated \
   --max-instances 3 \
   --memory 512Mi \
-  --build-env-vars "NEXT_PUBLIC_API_BASE=${API_URL},NEXT_PUBLIC_ALLOW_SIGNUP=false" \
+  --set-build-env-vars "NEXT_PUBLIC_API_BASE=${API_URL},NEXT_PUBLIC_ALLOW_SIGNUP=false" \
   --quiet
 
 URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
 
 # --- Let this app call the API --------------------------------------------
+#
+# Cloud Run serves a service on two hostnames — the opaque
+# <service>-<hash>-<region-code>.a.run.app that `describe` reports, and a
+# predictable <service>-<project-number>.<region>.run.app. Both are live, and
+# `describe` only names the first. Whichever one gets bookmarked has to work, so
+# both go into CORS; admitting only the reported one leaves the app silently
+# unable to reach its API from the other.
+
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null || true)"
+ALT_URL=""
+[ -n "$PROJECT_NUMBER" ] && ALT_URL="https://${SERVICE}-${PROJECT_NUMBER}.${REGION}.run.app"
+
+ORIGINS="$URL"
+[ -n "$ALT_URL" ] && [ "$ALT_URL" != "$URL" ] && ORIGINS="${URL},${ALT_URL}"
 
 CURRENT_CORS="$(gcloud run services describe "$API_SERVICE" --region "$REGION" \
   --format='value(spec.template.spec.containers[0].env.filter("name:CORS_ORIGIN").extract("value"))' 2>/dev/null || true)"
 
-if [ "$CURRENT_CORS" != "$URL" ]; then
-  say "Pointing the API's CORS at $URL…"
+# The value comes back wrapped as a list, so compare on the origins themselves.
+if ! printf '%s' "$CURRENT_CORS" | grep -qF "$URL" || { [ -n "$ALT_URL" ] && ! printf '%s' "$CURRENT_CORS" | grep -qF "$ALT_URL"; }; then
+  say "Pointing the API's CORS at the web app…"
+  # ^ escaped because --update-env-vars splits on commas unless told otherwise.
   gcloud run services update "$API_SERVICE" --region "$REGION" \
-    --update-env-vars "CORS_ORIGIN=${URL}" --quiet
+    --update-env-vars "^@^CORS_ORIGIN=${ORIGINS}" --quiet
 fi
 
 # Cloud Run keeps every image it has ever built, and storage is the only part of
@@ -81,5 +97,6 @@ done
 
 printf '\n\033[32m✓ Web app deployed\033[0m\n\n'
 printf '  %s\n' "$URL"
+[ -n "$ALT_URL" ] && [ "$ALT_URL" != "$URL" ] && printf '  %s   (same service, second hostname)\n' "$ALT_URL"
 printf '  talking to %s\n\n' "$API_URL"
 printf '  On his phone: open that URL → Share → Add to Home Screen.\n\n'

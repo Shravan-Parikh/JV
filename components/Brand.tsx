@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Brand.tsx — the JV Enterprises wordmark.
  *
@@ -8,14 +10,24 @@
  * else here depends on how the mark is produced.
  */
 
+import { useId } from 'react';
 import clsx from 'clsx';
 
-/** The monogram alone — sidebar header, favicon, mobile login. */
+/**
+ * The monogram alone — sidebar header, favicon, mobile login.
+ *
+ * The gradient id has to be unique per instance. Two marks render on the login
+ * screen, and a `fill="url(#id)"` resolves to the *first* matching id in the
+ * document — which, when the desktop brand panel is `display: none`, is a
+ * gradient inside a hidden subtree. The visible monogram then paints from
+ * nothing and the "JV" vanishes. `useId` is hydration-safe, unlike a counter.
+ */
 export function Mark({ className }: { className?: string }) {
+  const gradientId = `jv-flame-${useId()}`;
   return (
     <svg viewBox="0 0 48 48" className={className} role="img" aria-label="JV Enterprises">
       <defs>
-        <linearGradient id="jv-flame" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor="#e8341c" />
           <stop offset="100%" stopColor="#f58220" />
         </linearGradient>
@@ -45,7 +57,7 @@ export function Mark({ className }: { className?: string }) {
         fontFamily="Georgia, 'Times New Roman', serif"
         fontSize="22"
         fontWeight="700"
-        fill="url(#jv-flame)"
+        fill={`url(#${gradientId})`}
         letterSpacing="-0.5"
       >
         JV
