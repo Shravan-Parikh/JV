@@ -129,8 +129,12 @@ export interface Lot {
   inwardCones: number;
   outwardCones: number;
   balanceKg: number;
+  /** Pending on an open lot; the wastage on a complete one. `complete` says which. */
   gapPercent: number;
   delivered: boolean;
+  /** Delivered, and short by no more than the wastage tolerance. */
+  complete: boolean;
+  wastageKg: number;
   open: boolean;
   firstDate: string;
   lastDate: string;
@@ -153,8 +157,10 @@ export interface ClientBalance {
   active: boolean;
   known: boolean;
   openingBalance: number;
-  /** Job-work material of theirs still on JV's floor, in kg. */
+  /** Job-work material of theirs still on JV's floor, in kg — wastage excluded. */
   materialKg: number;
+  /** Lost in process on their finished lots. */
+  wastageKg: number;
   inwardKg: number;
   outwardKg: number;
   billed: number;
@@ -169,6 +175,7 @@ export interface LedgerSummary {
   totals: {
     clients: number;
     materialKg: number;
+    wastageKg: number;
     inwardKg: number;
     outwardKg: number;
     billed: number;

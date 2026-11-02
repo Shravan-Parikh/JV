@@ -450,6 +450,12 @@ function Ledger() {
                 <span className="num">
                   In {kgs(statement.summary.inwardKg)} · Out {kgs(statement.summary.outwardKg)}
                 </span>
+                {statement.summary.wastageKg > 0 && (
+                  <span className="num">
+                    Wastage on finished lots{' '}
+                    <strong className="text-slate-700">{kgs(statement.summary.wastageKg)}</strong>
+                  </span>
+                )}
                 {openLots.length > 0 && (
                   <span>
                     {openLots.length} open {openLots.length === 1 ? 'lot' : 'lots'}
@@ -501,7 +507,9 @@ function Ledger() {
                       <p className="text-sm font-semibold text-navy-800">{kgs(l.balanceKg)}</p>
                       <p className="text-[11px] text-slate-400">
                         {kgs(l.inwardKg, { unit: false })} in
-                        {l.delivered && ` · ${percent(l.gapPercent)} left`}
+                        {l.delivered
+                          ? ` · ${kgs(l.outwardKg, { unit: false })} out · ${percent(l.gapPercent)} pending`
+                          : ' · nothing delivered yet'}
                       </p>
                     </div>
                   </li>

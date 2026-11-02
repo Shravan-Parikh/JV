@@ -216,11 +216,9 @@ export default function DashboardPage() {
                           <span className="block text-sm font-semibold text-navy-800">
                             {kgs(l.balanceKg)}
                           </span>
-                          {l.delivered && (
-                            <span className="block text-[11px] text-slate-400">
-                              {percent(l.gapPercent)} left
-                            </span>
-                          )}
+                          <span className="block text-[11px] text-slate-400">
+                            {l.delivered ? `${percent(l.gapPercent)} pending` : 'not started'}
+                          </span>
                         </span>
                       </Link>
                     </li>

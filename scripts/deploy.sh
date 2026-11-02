@@ -101,10 +101,14 @@ ALT_URL=""
 ORIGINS="$URL"
 [ -n "$ALT_URL" ] && [ "$ALT_URL" != "$URL" ] && ORIGINS="${URL},${ALT_URL}"
 
-CURRENT_CORS="$(gcloud run services describe "$API_SERVICE" --region "$REGION" \
-  --format='value(spec.template.spec.containers[0].env.filter("name:CORS_ORIGIN").extract("value"))' 2>/dev/null || true)"
+CURRENT_CORS="$(gcloud run services describe "$API_SERVICE" --region "$REGION" --format=json 2>/dev/null \
+  | python3 -c 'import json,sys
+try:
+    env = json.load(sys.stdin)["spec"]["template"]["spec"]["containers"][0].get("env", [])
+    print(next((v.get("value", "") for v in env if v.get("name") == "CORS_ORIGIN"), ""))
+except Exception:
+    print("")' 2>/dev/null || true)"
 
-# The value comes back wrapped as a list, so compare on the origins themselves.
 if ! printf '%s' "$CURRENT_CORS" | grep -qF "$URL" || { [ -n "$ALT_URL" ] && ! printf '%s' "$CURRENT_CORS" | grep -qF "$ALT_URL"; }; then
   say "Pointing the API's CORS at the web app…"
   # ^ escaped because --update-env-vars splits on commas unless told otherwise.
