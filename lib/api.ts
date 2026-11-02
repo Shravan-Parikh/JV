@@ -10,7 +10,35 @@ import type {
   User,
 } from './types';
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4100/api';
+declare global {
+  interface Window {
+    __JV_API_BASE__?: string;
+  }
+}
+
+/**
+ * Where the API lives.
+ *
+ * Resolved at *runtime*, from a value the server writes into the page, rather
+ * than from `NEXT_PUBLIC_API_BASE` alone. `NEXT_PUBLIC_*` is inlined when the
+ * bundle is built, and a Cloud Run `--source` deploy does not forward its build
+ * env vars into the Dockerfile's ARGs — so that path silently compiled the
+ * localhost fallback into production and every call failed before it left the
+ * browser. Reading it at runtime also means pointing the app at a different API
+ * is an env-var change, not a rebuild.
+ *
+ * The chain is: value injected by the server → build-time value (local `npm run
+ * dev`, where .env.local is read) → the local default.
+ */
+function resolveApiBase(): string {
+  if (typeof window !== 'undefined' && window.__JV_API_BASE__) {
+    return window.__JV_API_BASE__;
+  }
+  return process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4100/api';
+}
+
+/** Read through a getter so it picks up the injected value after hydration. */
+export const apiBase = resolveApiBase;
 
 const TOKEN_KEY = 'jv_token';
 const REFRESH_KEY = 'jv_refresh';
@@ -67,7 +95,7 @@ async function refreshSession(): Promise<string | null> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
   if (!refreshInFlight) {
-    refreshInFlight = fetch(`${API_BASE}/auth/refresh`, {
+    refreshInFlight = fetch(`${apiBase()}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
@@ -93,7 +121,7 @@ async function send(path: string, options: RequestInit, token: string | null) {
   const headers = new Headers(options.headers);
   if (!(options.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  return fetch(`${API_BASE}${path}`, { ...options, headers });
+  return fetch(`${apiBase()}${path}`, { ...options, headers });
 }
 
 async function raw(path: string, options: RequestInit = {}): Promise<Response> {

@@ -40,9 +40,35 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+/**
+ * Rendered per request rather than prerendered, so the API address below is
+ * read from the running container's environment instead of being frozen in at
+ * build time. The app is client-rendered after hydration, so this costs
+ * nothing worth measuring.
+ */
+export const dynamic = 'force-dynamic';
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Runtime first, with the build-time value as the fallback for `npm run dev`.
+  const apiBase =
+    process.env.API_BASE || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4100/api';
+
   return (
     <html lang="en" className={`${inter.variable} ${serif.variable}`}>
+      <head>
+        {/*
+          Handed to the client here rather than inlined into the bundle: a Cloud
+          Run `--source` deploy does not forward build env vars into the
+          Dockerfile's ARGs, so the NEXT_PUBLIC_* route quietly shipped the
+          localhost default to production. JSON.stringify keeps the value safely
+          escaped inside the script.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__JV_API_BASE__=${JSON.stringify(apiBase)}`,
+          }}
+        />
+      </head>
       <body>
         <AuthProvider>{children}</AuthProvider>
       </body>

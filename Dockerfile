@@ -13,12 +13,12 @@ RUN npm ci
 
 COPY . .
 
-# NEXT_PUBLIC_* values are inlined into the client bundle at build time, so the
-# API URL has to be known here — it cannot come from the Cloud Run service's
-# environment the way a server-side variable would.
-ARG NEXT_PUBLIC_API_BASE
+# The API address is NOT baked in here. It is read at runtime from API_BASE by
+# the root layout and handed to the browser in the page, because a Cloud Run
+# `--source` deploy does not pass its build env vars through to these ARGs —
+# relying on NEXT_PUBLIC_API_BASE silently compiled the localhost default into
+# production. This ARG remains only for a hand-run `docker build`.
 ARG NEXT_PUBLIC_ALLOW_SIGNUP=false
-ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 ENV NEXT_PUBLIC_ALLOW_SIGNUP=$NEXT_PUBLIC_ALLOW_SIGNUP
 
 RUN npm run build

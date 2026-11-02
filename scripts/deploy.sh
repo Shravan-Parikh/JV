@@ -32,8 +32,18 @@ PROJECT="$(gcloud config get-value project 2>/dev/null)"
 [ -n "$PROJECT" ] && [ "$PROJECT" != "(unset)" ] \
   || die "No project set. Run: gcloud config set project <project-id>"
 
-# Fall back to asking Cloud Run where the API is, so the usual case needs no
-# arguments and cannot be given a stale URL by hand.
+# Ask Cloud Run where the API is, so the usual case needs no arguments and
+# cannot be given a stale URL by hand.
+#
+# Which of the two hostnames gets baked in matters, and not for a reason the
+# server can see. `describe` reports the opaque <service>-<hash>-<code>.a.run.app
+# form, but `a.run.app` is heavily abused for phishing and appears on common
+# blocklists, so ad blockers, DNS filters and some ISPs refuse it — the browser
+# then fails the request before it leaves the machine, preflight included, which
+# looks exactly like a CORS fault and is not one. The
+# <service>-<project-number>.<region>.run.app form is the same service on a
+# domain nobody filters, and is the one the web app itself is served from. So
+# that is what the client bundle calls.
 API_URL="${JV_API_URL:-}"
 if [ -z "$API_URL" ]; then
   API_ROOT="$(gcloud run services describe "$API_SERVICE" --region "$REGION" \
@@ -41,21 +51,36 @@ if [ -z "$API_URL" ]; then
   [ -n "$API_ROOT" ] || die "Could not find the '$API_SERVICE' service in $REGION.
   Deploy the API first (in the JV-Backend repo: ./scripts/deploy.sh),
   or pass its address: JV_API_URL=https://…/api ./scripts/deploy.sh"
+
+  PROJECT_NUMBER="$(gcloud projects describe "$PROJECT" --format='value(projectNumber)' 2>/dev/null || true)"
+  if [ -n "$PROJECT_NUMBER" ]; then
+    PREFERRED="https://${API_SERVICE}-${PROJECT_NUMBER}.${REGION}.run.app"
+    # Only switch to it once it actually answers, so a Cloud Run change to the
+    # naming scheme degrades to the reported URL instead of breaking the build.
+    if curl -fsS -m 15 -o /dev/null "${PREFERRED}/api/health" 2>/dev/null; then
+      API_ROOT="$PREFERRED"
+    else
+      say "Note: ${PREFERRED} did not answer; falling back to ${API_ROOT}"
+    fi
+  fi
   API_URL="${API_ROOT}/api"
 fi
 
 say "Deploying $SERVICE against $API_URL"
 
-# NEXT_PUBLIC_* is inlined into the client bundle at build time, so this is a
-# build argument rather than a runtime variable — changing the API address means
-# rebuilding, not just restarting.
+# API_BASE is a RUNTIME variable, read per request by the root layout and handed
+# to the browser in the page. It is deliberately not NEXT_PUBLIC_*: those are
+# inlined when the bundle is built, and a `--source` deploy does not forward
+# build env vars into the Dockerfile's ARGs, so that route silently shipped the
+# localhost default to production. As a runtime value, repointing the app at a
+# different API is an env-var update rather than a rebuild.
 gcloud run deploy "$SERVICE" \
   --source . \
   --region "$REGION" \
   --allow-unauthenticated \
   --max-instances 3 \
   --memory 512Mi \
-  --set-build-env-vars "NEXT_PUBLIC_API_BASE=${API_URL},NEXT_PUBLIC_ALLOW_SIGNUP=false" \
+  --set-env-vars "API_BASE=${API_URL},NEXT_PUBLIC_ALLOW_SIGNUP=false" \
   --quiet
 
 URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
