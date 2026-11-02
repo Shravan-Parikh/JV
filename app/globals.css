@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-800 antialiased;
+}
+
+/* Thin, unobtrusive scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-navy-800 text-white hover:bg-navy-900 shadow-sm;
+  }
+  .btn-accent {
+    @apply btn bg-flame-500 text-white hover:bg-flame-600 shadow-sm;
+  }
+  .btn-secondary {
+    @apply btn bg-white text-slate-700 border border-slate-200 hover:bg-slate-50;
+  }
+  .input {
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-navy-400 focus:ring-2 focus:ring-navy-100 focus:outline-none;
+  }
+  .label {
+    @apply block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5;
+  }
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+  }
+
+  /*
+   * Weights, rates and money line up only in a tabular figure face, and a
+   * column of amounts that doesn't line up is a column nobody can scan.
+   */
+  .num {
+    @apply tabular-nums;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/*
+ * iOS zooms the page in when a focused input's text is under 16px, and never
+ * zooms back out — which on a phone leaves the form half off-screen after the
+ * first tap. The app's inputs are 14px by design, so they are nudged up to 16px
+ * on touch devices only.
+ */
+@media (hover: none) and (pointer: coarse) {
+  .input,
+  select.input,
+  textarea.input {
+    font-size: 16px;
+  }
+}
